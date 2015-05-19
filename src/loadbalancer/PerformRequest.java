@@ -15,7 +15,7 @@ public class PerformRequest {
 	}
 	public String getDisplay(){
 		if(!isValid){
-			return new String("Erreur de configuration, nombre de serveurs actifs supérieur au nombre de serveurs de la ferme");
+			return new String("Erreur dans le fichier de config, un ou plusieurs serveurs de la liste workers n'existent pas");
 		}
 		return new String("");
 	};

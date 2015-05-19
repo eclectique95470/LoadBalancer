@@ -50,29 +50,39 @@ public class LoadBalancer {
 	private void run()throws IOException{
 		int port = 8080;
 		int callIndex = -1;
-		int nbServeur = 0;
+		int currentWorker = 0;
 		boolean isConfigValid = true;
-		System.out.println(lbmap.get("0.workers"));
-		String[] ActiveServeur =  lbmap.get("0.workers").split(",");
-		int nbActiveServeur = Integer.parseInt(ActiveServeur[1]) - Integer.parseInt(ActiveServeur[0]) +1;
+		ArrayList<String> declaredServers = new ArrayList<>();
+		ArrayList<String> workersServers = new ArrayList<>();
+		int nbServers;
 		
-		int beginIndex = Integer.parseInt(ActiveServeur[0]);
-		int endIndex = Integer.parseInt(ActiveServeur[1]);
-		ArrayList<String> activeServeurList = new ArrayList<String>();
-		for(int i=beginIndex;i<=endIndex;i++)
-			activeServeurList.add(i+"");
 		for(Entry<String, String> entry : workermap.entrySet()) {
 		    String key = entry.getKey();
-		    if(key.contains(".ip"))
-		    	nbServeur++;
+		    if(key.contains("ip")){
+		    	declaredServers.add(key.substring(0,key.indexOf(".")));
+		    }
 		}
+		String[] tempServers = lbmap.get("0.workers").split(",");
+		for (String aServer : tempServers) {
+			workersServers.add(aServer);
+		}
+		nbServers = workersServers.size();
 		
-		System.out.println("nombre de serveurs : "+nbServeur);
-		System.out.println("nombre de serveurs actifs : "+nbActiveServeur);
-		System.out.println("serveur range : "+activeServeurList);
-		if(nbServeur < nbActiveServeur)
-			isConfigValid = false;
-		int currentWorker = 0;
+		System.out.println(declaredServers);
+		System.out.println(workersServers);
+		boolean findIt = false;
+		UNVALID: for (String aDeclaredServer : declaredServers) {
+			for (String aWorkerServer : workersServers) {
+				if(aDeclaredServer.equals(aWorkerServer))
+					findIt = true;
+			}
+			if(!findIt){
+				isConfigValid = false;
+				break UNVALID;
+			}
+		}
+		System.out.println(isConfigValid);
+		
 		ServerSocket serveur = new ServerSocket(port);
 		try{
 			while(true){
@@ -83,7 +93,7 @@ public class LoadBalancer {
 				inputLine = in.readLine();
 				String address = inputLine;
 				try{
-					PerformRequest pr = new PerformRequest(route,address,port, isConfigValid);
+					PerformRequest pr = new PerformRequest(route,address,port,isConfigValid);
 					String display = pr.getDisplay();
 					OutputStreamWriter outWriter;
 					PrintWriter out =
@@ -91,16 +101,16 @@ public class LoadBalancer {
 	                out.println(display);
 					if(!display.contains("Erreur")){
 						if(!route.equals("/favicon.ico")){
-							callIndex+=1;
-							currentWorker = callIndex % nbServeur;
-							currentWorker += Integer.parseInt(activeServeurList.get(0));
+							++callIndex;
+							int workersIndex = callIndex % nbServers;
+							currentWorker = Integer.parseInt(workersServers.get(workersIndex));
 						}
 						//Implémenter ici le serveur range a interoger
-		                out.println("Ma ferme contient "+nbServeur+" serveurs");
+		                out.println("Ma ferme contient "+nbServers+" serveurs");
 		                out.println("Requette numéro : "+callIndex);
 		                out.println("Serveur a atteindre : "+currentWorker);
-		                out.println("Serveurs actifs : "+activeServeurList);
 		                out.println("Ip du serveur a ateindre : "+workermap.get(""+currentWorker+".ip")+" sur le port "+workermap.get(""+currentWorker+".port"));
+		                
 					}
 
 				}finally{
